@@ -41,17 +41,36 @@ dir_entry dir[128];
 
 
 int fs_init() {
-  printf("Função não implementada: fs_init\n");
+  unsigned lidos;
+  lidos = fread(dir,32,128,stream);
+  if(lidos!=128)
+  {
+    // printf("Erro ao ler a FAT!\n"); ????
+    /*Se FAT Nao existente*/
+    dir[0].used = 3; /*Referencia à FAT*/
+    dir[1].used = 4; /*Referência ao Dir*/
+
+    for(c=2;c<128;c++)
+      dir[c].used = 1;
+    fseek(stream,0,SEEK_SET);
+
+  }
+  else
+
+  printf("Função mal implementada: fs_init\n");
+  /*Aqui se carrega os diretorios*/
   return 1;
 }
 
 int fs_format() {
   printf("Função não implementada: fs_format\n");
+  /*Aqui limpa os diretorios*/
   return 0;
 }
 
 int fs_free() {
   printf("Função não implementada: fs_free\n");
+  /*Libera tuto?*/
   return 0;
 }
 
@@ -72,6 +91,7 @@ int fs_remove(char *file_name) {
 
 int fs_open(char *file_name, int mode) {
   printf("Função não implementada: fs_open\n");
+  /*Aqui tem um fopen("novoarquivo","r")*/
   return -1;
 }
 
@@ -89,4 +109,3 @@ int fs_read(char *buffer, int size, int file) {
   printf("Função não implementada: fs_read\n");
   return -1;
 }
-
