@@ -39,11 +39,7 @@ typedef struct {
 
 dir_entry dir[128]; /*COLEÇÃO DE DIRETÓRIOS*/
 
-/*Inicia o sistema de arquivos e suas estruturas internas. Esta
-função é automaticamente chamada pelo interpretador de comandos no
-início do sistema. Esta função deve carregar dados do disco para restaurar
-um sistema já em uso e é um bom momento para verificar se o disco
-está formatado.*/
+
 
 int is_formated()
 {
@@ -56,7 +52,14 @@ int is_formated()
   if(fat[c]!=4) /*Verifica se o diretorio ta no lugar que deveria estar*/
     return 0;
   return 1; /*Se tudo estava certo, entao ok*/
-}	
+}
+
+/*Inicia o sistema de arquivos e suas estruturas internas. Esta
+função é automaticamente chamada pelo interpretador de comandos no
+início do sistema. Esta função deve carregar dados do disco para restaurar
+um sistema já em uso e é um bom momento para verificar se o disco
+está formatado.*/
+
 int fs_init() {
   fread(dir,32,128,stream);
   if(dir[0].used=0) /*FAT Ainda nao criada*/
