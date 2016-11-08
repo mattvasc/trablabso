@@ -39,7 +39,6 @@ typedef struct {
 
 dir_entry dir[128]; /*COLEÇÃO DE DIRETÓRIOS*/
 
-
 int is_formated()
 {
   int c;
@@ -51,7 +50,6 @@ int is_formated()
   if(fat[c]!=4) /*Verifica se o diretorio ta no lugar que deveria estar*/
     return 0;
   return 1; /*Se tudo estava certo, entao ok*/
-}	
 
 /*Inicia o sistema de arquivos e suas estruturas internas. Esta
 função é automaticamente chamada pelo interpretador de comandos no
