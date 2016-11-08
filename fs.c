@@ -41,11 +41,15 @@ dir_entry dir[128]; /*COLEÇÃO DE DIRETÓRIOS*/
 
 
 int fs_init() {
-  fread(dir,32,128,stream);
+
+  if(!is_formated()) {
+    return 0;
+  }
+
+  fread(fat, 32, 128, stream);
+
   if(dir[0].used=0) /*FAT Ainda nao criada*/
   {
-    dir[0].used = 3; /*Referencia à FAT*/
-    dir[1].used = 4; /*Referência ao Dir*/
     for(c=2;c<128;c++)
       dir[c].used = 1; /*Falando que ta tudo liberado =) */
     fseek(stream,0,SEEK_SET); /* Rebobinando o ponteiro do arquivo ao seu inicio*/
