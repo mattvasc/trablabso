@@ -28,7 +28,7 @@
 
 #define CLUSTERSIZE 4096
 
-unsigned short fat[65536];
+unsigned short fat[65536]; /*TABELA FAT*/
 
 typedef struct {
        char used;
@@ -37,7 +37,7 @@ typedef struct {
        int size;
 } dir_entry;
 
-dir_entry dir[128];
+dir_entry dir[128]; /*COLEÇÃO DE DIRETÓRIOS*/
 
 /*Inicia o sistema de arquivos e suas estruturas internas. Esta
 função é automaticamente chamada pelo interpretador de comandos no
@@ -45,14 +45,35 @@ início do sistema. Esta função deve carregar dados do disco para restaurar
 um sistema já em uso e é um bom momento para verificar se o disco
 está formatado.*/
 int fs_init() {
-  printf("Função não implementada: fs_init\n");
+  fread(dir,32,128,stream);
+  if(dir[0].used=0) /*FAT Ainda nao criada*/
+  {
+    dir[0].used = 3; /*Referencia à FAT*/
+    dir[1].used = 4; /*Referência ao Dir*/
+    for(c=2;c<128;c++)
+      dir[c].used = 1; /*Falando que ta tudo liberado =) */
+    fseek(stream,0,SEEK_SET); /* Rebobinando o ponteiro do arquivo ao seu inicio*/
+
+  }
+  else
+
+  printf("Função mal implementada: fs_init\n");
+  /*Aqui se carrega os diretorios*/
   return 1;
 }
 /*Inicia o dispositivo de disco para uso, iniciando e escre-
 vendo as estruturas de dados necessárias.*/
 int fs_format() {
+  int c;
+  for(c=0;c<32;fat[c++]=3); /*Referenciando a FAT*/
+  fat[c++] = 4; /*Referenciando o Diretorio*/
+  for(;c<65536;fat[c++] = 1); /*Referenciando blocos livres*/
+  memset(dir,0,sizeof(dir_entry)*128); /*Zerando a arvore de diretorios*/
+  fwrite(fat,sizeof(unsigned),65536,stream);
+  fwrite(dir,sizeof(dir_entry,128,stream));
+  fseek(stream,0,SEEK_SET);
   printf("Função não implementada: fs_format\n");
-  return 0;
+  return 1;
 }
 /*Retorna o espaço livre no dispositivo em bytes.*/
 int fs_free() {
