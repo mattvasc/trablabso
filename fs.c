@@ -28,7 +28,7 @@
 
 #define CLUSTERSIZE 4096
 
-unsigned short fat[65536];
+unsigned short fat[65536]; /*TABELA FAT*/
 
 typedef struct {
        char used;
@@ -37,22 +37,18 @@ typedef struct {
        int size;
 } dir_entry;
 
-dir_entry dir[128];
+dir_entry dir[128]; /*COLEÇÃO DE DIRETÓRIOS*/
 
 
 int fs_init() {
-  unsigned lidos;
-  lidos = fread(dir,32,128,stream);
-  if(lidos!=128)
+  fread(dir,32,128,stream);
+  if(dir[0].used=0) /*FAT Ainda nao criada*/
   {
-    // printf("Erro ao ler a FAT!\n"); ????
-    /*Se FAT Nao existente*/
     dir[0].used = 3; /*Referencia à FAT*/
     dir[1].used = 4; /*Referência ao Dir*/
-
     for(c=2;c<128;c++)
-      dir[c].used = 1;
-    fseek(stream,0,SEEK_SET);
+      dir[c].used = 1; /*Falando que ta tudo liberado =) */
+    fseek(stream,0,SEEK_SET); /* Rebobinando o ponteiro do arquivo ao seu inicio*/
 
   }
   else
@@ -63,14 +59,20 @@ int fs_init() {
 }
 
 int fs_format() {
+  int c;
+  for(c=0;c<32;fat[c++]=3); /*Referenciando a FAT*/
+  fat[c++] = 4; /*Referenciando o Diretorio*/
+  for(;c<65536;fat[c++] = 1); /*Referenciando blocos livres*/
+  memset(dir,0,sizeof(dir_entry)*128); /*Zerando a arvore de diretorios*/
+  fwrite(fat,sizeof(unsigned),65536,stream);
+  fwrite(dir,sizeof(dir_entry,128,stream));
+  fseek(stream,0,SEEK_SET);
   printf("Função não implementada: fs_format\n");
-  /*Aqui limpa os diretorios*/
-  return 0;
+  return 1;
 }
 
 int fs_free() {
   printf("Função não implementada: fs_free\n");
-  /*Libera tuto?*/
   return 0;
 }
 
@@ -91,7 +93,6 @@ int fs_remove(char *file_name) {
 
 int fs_open(char *file_name, int mode) {
   printf("Função não implementada: fs_open\n");
-  /*Aqui tem um fopen("novoarquivo","r")*/
   return -1;
 }
 
