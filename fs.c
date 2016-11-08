@@ -44,6 +44,19 @@ função é automaticamente chamada pelo interpretador de comandos no
 início do sistema. Esta função deve carregar dados do disco para restaurar
 um sistema já em uso e é um bom momento para verificar se o disco
 está formatado.*/
+
+int is_formated()
+{
+  int c;
+  fseek(stream,0,SEEK_SET); /*Rebobina o ponteiro do arquivo*/
+  fread(fat,  sizeof(short) , 33 , stream); /*Le apenas a FAT do Disco para o vetor da FAT*/
+  for(c=0;c<32;c++)
+    if(fat[c]!=3) /*Verifica se os primeiros 32 agrupamentos da tabela referenciam ela mesma*/
+      return 0;
+  if(fat[c]!=4) /*Verifica se o diretorio ta no lugar que deveria estar*/
+    return 0;
+  return 1; /*Se tudo estava certo, entao ok*/
+}	
 int fs_init() {
 
   if(!is_formated()) {
