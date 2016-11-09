@@ -60,17 +60,28 @@ está formatado.*/
 
 int fs_init() {
 
+
   if(!is_formated()) {
-    return 0;
+    fs_format();
+  }
+  else {
+
+
+    fseek(stream, 0, SEEK_SET);
+
+
+    fread(fat, sizeof(short), 65536, stream);
+
+
+    fread(dir, sizeof(dir_entry), 128, stream)
   }
 
-  fread(fat, 32, 128, stream);
 
-
-  printf("Função mal implementada: fs_init\n");
+  //printf("Função mal implementada: fs_init\n");
   /*Aqui se carrega os diretorios*/
   return 1;
 }
+
 /*Inicia o dispositivo de disco para uso, iniciando e escre-
 vendo as estruturas de dados necessárias.*/
 int fs_format() {
