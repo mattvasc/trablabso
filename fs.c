@@ -73,7 +73,7 @@ int fs_format() {
     fat[c] = 3;
 
   fat[c++] = 4; /*Referenciando o Diretorio*/
-  for(;c<65536; c++) /*Referenciando blocos livres*/
+  for(;c<bl_size()/8; c++) /*Referenciando blocos livres ate apenas o tamanho do disco*/
     fat[c] = 1;
   for(c = 0; c < 256; c++) /*32 bloco da fat * 8 setores por bloco */
     bl_write(c, (buffer+ c * 512)); /*para ler de 512byte em 512byte*/
@@ -81,41 +81,64 @@ int fs_format() {
   memset(dir,0,sizeof(dir_entry)*128); /*Zerando a arvore de diretorios*/
   buffer = (char *) dir; /*parando em cima do DIR*/
   for(c = 0; c < 8; c++) /*4K / 512 (SECTORSIZE)*/
-    bl_write(c, buffer + c*512);
+    bl_write(c+256, buffer + c*512);
   return 1;
 }
 /*Retorna o espaço livre no dispositivo em bytes.*/
 int fs_free() {
-  printf("Função não implementada: fs_free\n");
-  return 0;
+  unsigned c, count;
+  for(c=33, count=0 ;c<bl_size()/8;c++)
+    if(fat[c]==1)
+      count++;
+  return count*4096;
 }
 /*Lista os arquivos do diretório, colo-
 cando a saída formatada em buffer . O formato é simples, um arquivo
 por linha, seguido de seu tamanho e separado por dois tabs. Observe
 que a sua função não deve escrever na tela.*/
 int fs_list(char *buffer, int size) {
-  printf("Função não implementada: fs_list\n");
-  int i;
-  buffer[0] = '\0';
-  // if(is_formated){
-    for(i = 0; i < 128; i++){
-      if(strlen(buffer) < size){
-        sprintf(buffer,"%s %s %d\t\t", buffer, dir[i].name, dir[i].size);
-      }else{
-        perror("Tamanho do buffer maior.");
-      }
+  int i, imprimiu;
+  for(i = 0; i < 128; i++){
+    if(dir[i].used){
+      imprimiu = sprintf(buffer,"%s\t\t%d\n", dir[i].name, dir[i].size);
+      buffer+=imprimiu;
     }
-  // }else{
-  //   perror("Disco nao formatado!\n");
-  //   return 1;
-  // }
-  return 0;
+  }
+  buffer='\0';
+  return 1;
 }
 
 /*Cria um novo arquivo com nome
 file_name e tamanho 0. Um erro deve ser gerado se o arquivo já existe.*/
-int fs_create(char* file_name) {
-  printf("Função não implementada: fs_create\n");
+int fs_create(char* file_name) { /*ARRUMAR O SALVAMENTO DA FAT/DIR NO DISCO!!!!!!! */
+  int c,d,e;
+  char *buffer;
+  for(c=0,d=-1; c<128; c++)
+  {
+    if(dir[c].used && !strcmp(file_name,dir[c].name))
+      return 0;
+    else if(!dir[c].used && d ==-1 )
+      d = c;
+  }
+
+  for(e = 33; e < bl_size()/8; e++)
+    if(fat[e]==1){
+      strcpy(dir[d].name, file_name);
+      dir[d].used = 1;
+      dir[d].size = 0;
+      dir[d].first_block = e;
+      fat[e] = 2;
+      buffer = (char*)fat;
+      for(c = 0; c < 256; c++) /*32 bloco da fat * 8 setores por bloco */
+        bl_write(c, (buffer+ c * 512)); /*para ler de 512byte em 512byte*/
+
+      buffer = (char *) dir; /*parando em cima do DIR*/
+      for(c = 0; c < 8; c++) /*4K / 512 (SECTORSIZE)*/
+        bl_write(c+256, buffer + c*512);
+
+      return 1;
+    }
+  perror("Disco cheio!\n");
   return 0;
 }
 
