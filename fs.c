@@ -104,6 +104,7 @@ int fs_create(char* file_name) {
   printf("Função não implementada: fs_create\n");
   return 0;
 }
+
 /*Remove o arquivo com nome
 file_name . Um erro deve ser gerado se o arquivo não existe.*/
 int fs_remove(char *file_name){
