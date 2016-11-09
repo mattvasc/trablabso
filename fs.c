@@ -50,7 +50,7 @@ int fs_init()
   char *buffer;
   buffer = (char *) fat;
   int c;
-  for(c = 0; c < 256; c++)
+  for(c = 0; c < 256; c++) /*32 blocos * 4k / 8 blocos per sector */
     bl_read(c, buffer + c * 512);
   for(c = 0; c < 32; c++)
     if(fat[c] != 3)
@@ -58,6 +58,11 @@ int fs_init()
 
   if(fat[c] != 4)
     return fs_format();
+
+buffer = (char *) dir;
+
+for(c = 0; c < 8; c++)
+  bl_read(c+256, buffer + c * 512);
 
   return 1;
 }
@@ -67,7 +72,7 @@ vendo as estruturas de dados necessárias.*/
 int fs_format() {
   int c;
   char *buffer = (char * ) fat;
-  puts("entrei no format");
+  puts("Formatando o disco...");
   /*Referenciando a FAT*/
   for(c = 0; c < 32; c++)
     fat[c] = 3;
@@ -82,6 +87,8 @@ int fs_format() {
   buffer = (char *) dir; /*parando em cima do DIR*/
   for(c = 0; c < 8; c++) /*4K / 512 (SECTORSIZE)*/
     bl_write(c+256, buffer + c*512);
+
+  puts("Disco formatado.");
   return 1;
 }
 /*Retorna o espaço livre no dispositivo em bytes.*/
@@ -110,13 +117,16 @@ int fs_list(char *buffer, int size) {
 
 /*Cria um novo arquivo com nome
 file_name e tamanho 0. Um erro deve ser gerado se o arquivo já existe.*/
-int fs_create(char* file_name) { /*ARRUMAR O SALVAMENTO DA FAT/DIR NO DISCO!!!!!!! */
+int fs_create(char* file_name) {
   int c,d,e;
   char *buffer;
   for(c=0,d=-1; c<128; c++)
   {
-    if(dir[c].used && !strcmp(file_name,dir[c].name))
+    if(dir[c].used && !strcmp(file_name,dir[c].name)) {
+      puts("Arquivo já existente");
       return 0;
+    }
+
     else if(!dir[c].used && d ==-1 )
       d = c;
   }
@@ -147,7 +157,7 @@ file_name . Um erro deve ser gerado se o arquivo não existe.*/
 int fs_remove(char *file_name){
   int i,prox;
   unsigned short posicaoInicialFAT;
-  char existe = 0;
+  char existe = 0, *buffer;
   /*busco o nome do arquivo e salvo o primeiro bloco*/
   for(i = 0; i < 128; i++)
     if(dir[i].used && !strcmp(dir[i].name, file_name)){
@@ -157,7 +167,7 @@ int fs_remove(char *file_name){
       break;
     }
   if(!existe){
-    perror("Arquivo nao existe!\n");
+    puts("Arquivo nao existe!");
     return 0;
   }else{
     /*limpo no fat os ponteiros para o arquivo, marcando como 1 == livre*/
@@ -167,7 +177,17 @@ int fs_remove(char *file_name){
       prox = fat[prox];
       fat[prox] = 1;
     }
-    fat[prox] = 1;
+
+    buffer = (char *) fat;
+
+    for(i = 0; i < 256; i++)
+      bl_write(i, buffer + 512 * i);
+
+    buffer = (char *) dir;
+
+    for (i = 0; i < 8; i++)
+      bl_write(i + 256, buffer + 512 * i);
+
     return 1;
   }
 }
