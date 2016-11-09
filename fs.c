@@ -101,9 +101,9 @@ int fs_list(char *buffer, int size) {
   if(is_formated){
     for(i = 0; i < 128; i++){
       if(strlen(buffer) < size){
-        sprintf(buffer,"%s %s %d\t\t", buffer, dir_entry[i].name, dir_entry[i].tamanho);
+        sprintf(buffer,"%s %s %d\t\t", buffer, dir[i].name, dir[i].size);
       }else{
-        perror("Tamanho do buffer maior.")
+        perror("Tamanho do buffer maior.");
       }
     }
   }else{
@@ -128,9 +128,9 @@ int fs_remove(char *file_name){
   char existe = 0;
   /*busco o nome do arquivo e salvo o primeiro bloco*/
   for(i = 0; i < 128; i++)
-    if(dir_entry[i].used && !strcmp(dir_entry[i].name, file_name)){
-      dir_entry[i].used = 0;
-      posicaoInicialFAT = dir_entry[i].first_block;
+    if(dir[i].used && !strcmp(dir[i].name, file_name)){
+      dir[i].used = 0;
+      posicaoInicialFAT = dir[i].first_block;
       existe = 1;
       break;
     }
