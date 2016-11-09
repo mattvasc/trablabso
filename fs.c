@@ -96,8 +96,23 @@ por linha, seguido de seu tamanho e separado por dois tabs. Observe
 que a sua função não deve escrever na tela.*/
 int fs_list(char *buffer, int size) {
   printf("Função não implementada: fs_list\n");
+  int i;
+  buffer[0] = '\0';
+  if(is_formated){
+    for(i = 0; i < 128; i++){
+      if(strlen(buffer) < size){
+        sprintf(buffer,"%s %s %d\t\t", buffer, dir_entry[i].name, dir_entry[i].tamanho);
+      }else{
+        perror("Tamanho do buffer maior.")
+      }
+    }
+  }else{
+    perror("Disco nao formatado!\n");
+    return 1;
+  }
   return 0;
 }
+
 /*Cria um novo arquivo com nome
 file_name e tamanho 0. Um erro deve ser gerado se o arquivo já existe.*/
 int fs_create(char* file_name) {
