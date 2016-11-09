@@ -39,61 +39,49 @@ typedef struct {
 
 dir_entry dir[128]; /*COLEÇÃO DE DIRETÓRIOS*/
 
-int is_formated()
-{
-  int c;
-  fseek(stream,0,SEEK_SET); /*Rebobina o ponteiro do arquivo*/
-  fread(fat,  sizeof(short) , 33 , stream); /*Le apenas a FAT do Disco para o vetor da FAT*/
-  for(c=0;c<32;c++)
-    if(fat[c]!=3) /*Verifica se os primeiros 32 agrupamentos da tabela referenciam ela mesma*/
-      return 0;
-  if(fat[c]!=4) /*Verifica se o diretorio ta no lugar que deveria estar*/
-    return 0;
-  return 1; /*Se tudo estava certo, entao ok*/
-}
-
 /*Inicia o sistema de arquivos e suas estruturas internas. Esta
 função é automaticamente chamada pelo interpretador de comandos no
 início do sistema. Esta função deve carregar dados do disco para restaurar
 um sistema já em uso e é um bom momento para verificar se o disco
 está formatado.*/
 
-int fs_init() {
+int fs_init()
+{
+  char *buffer;
+  buffer = (char *) fat;
+  int c;
+  for(c = 0; c < 256; c++)
+    bl_read(c, buffer + c * 512);
+  for(c = 0; c < 32; c++)
+    if(fat[c] != 3)
+      return fs_format();
 
+  if(fat[c] != 4)
+    return fs_format();
 
-  if(!is_formated()) {
-    fs_format();
-  }
-  else {
-
-
-    fseek(stream, 0, SEEK_SET);
-
-
-    fread(fat, sizeof(short), 65536, stream);
-
-
-    fread(dir, sizeof(dir_entry), 128, stream)
-  }
-
-
-  //printf("Função mal implementada: fs_init\n");
-  /*Aqui se carrega os diretorios*/
   return 1;
 }
-
 /*Inicia o dispositivo de disco para uso, iniciando e escre-
 vendo as estruturas de dados necessárias.*/
+/*VERIFICAR O RETORNO DO bl_write*/
 int fs_format() {
   int c;
-  for(c=0;c<32;fat[c++]=3); /*Referenciando a FAT*/
+  char *buffer = (char * ) fat;
+  puts("entrei no format");
+  /*Referenciando a FAT*/
+  for(c = 0; c < 32; c++)
+    fat[c] = 3;
+
   fat[c++] = 4; /*Referenciando o Diretorio*/
-  for(;c<65536;fat[c++] = 1); /*Referenciando blocos livres*/
+  for(;c<65536; c++) /*Referenciando blocos livres*/
+    fat[c] = 1;
+  for(c = 0; c < 256; c++) /*32 bloco da fat * 8 setores por bloco */
+    bl_write(c, (buffer+ c * 512)); /*para ler de 512byte em 512byte*/
+
   memset(dir,0,sizeof(dir_entry)*128); /*Zerando a arvore de diretorios*/
-  fwrite(fat,sizeof(unsigned),65536,stream);
-  fwrite(dir,sizeof(dir_entry,128,stream));
-  fseek(stream,0,SEEK_SET);
-  printf("Função não implementada: fs_format\n");
+  buffer = (char *) dir; /*parando em cima do DIR*/
+  for(c = 0; c < 8; c++) /*4K / 512 (SECTORSIZE)*/
+    bl_write(c, buffer + c*512);
   return 1;
 }
 /*Retorna o espaço livre no dispositivo em bytes.*/
@@ -109,7 +97,7 @@ int fs_list(char *buffer, int size) {
   printf("Função não implementada: fs_list\n");
   int i;
   buffer[0] = '\0';
-  if(is_formated){
+  // if(is_formated){
     for(i = 0; i < 128; i++){
       if(strlen(buffer) < size){
         sprintf(buffer,"%s %s %d\t\t", buffer, dir[i].name, dir[i].size);
@@ -117,10 +105,10 @@ int fs_list(char *buffer, int size) {
         perror("Tamanho do buffer maior.");
       }
     }
-  }else{
-    perror("Disco nao formatado!\n");
-    return 1;
-  }
+  // }else{
+  //   perror("Disco nao formatado!\n");
+  //   return 1;
+  // }
   return 0;
 }
 
