@@ -65,14 +65,6 @@ int fs_init() {
 
   fread(fat, 32, 128, stream);
 
-  if(dir[0].used=0) /*FAT Ainda nao criada*/
-  {
-    for(c=2;c<128;c++)
-      dir[c].used = 1; /*Falando que ta tudo liberado =) */
-    fseek(stream,0,SEEK_SET); /* Rebobinando o ponteiro do arquivo ao seu inicio*/
-
-  }
-  else
 
   printf("Função mal implementada: fs_init\n");
   /*Aqui se carrega os diretorios*/
@@ -113,28 +105,31 @@ int fs_create(char* file_name) {
 }
 /*Remove o arquivo com nome
 file_name . Um erro deve ser gerado se o arquivo não existe.*/
-int fs_remove(char *file_name) {
-  int i;
+int fs_remove(char *file_name){
+  int i,prox;
+  unsigned short posicaoInicialFAT;
+  char existe = 0;
   /*busco o nome do arquivo e salvo o primeiro bloco*/
-  for(i = 0; i < 128; i++){
-    if(strcmp(dir_entry[i].name, file_name) == 0){
+  for(i = 0; i < 128; i++)
+    if(dir_entry[i].used && !strcmp(dir_entry[i].name, file_name)){
       dir_entry[i].used = 0;
-      unsigned short posicaoInicialFAT = dir_entry[i].first_block;
+      posicaoInicialFAT = dir_entry[i].first_block;
+      existe = 1;
       break;
     }
-  }
-  if(strcmp(dir_entry[i].name, file_name) != 0){
+  if(!existe){
     perror("Arquivo nao existe!\n");
-    return 1;
+    return 0;
   }else{
     /*limpo no fat os ponteiros para o arquivo, marcando como 1 == livre*/
-    int prox = fat[posicaoInicialFAT];
+    prox = fat[posicaoInicialFAT];
+    fat[posicaoInicialFAT] = 1;
     while(prox != 2){
       prox = fat[prox];
       fat[prox] = 1;
     }
     fat[prox] = 1;
-    return 0;
+    return 1;
   }
 }
 /*Abre o arquivo file_name
