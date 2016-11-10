@@ -139,13 +139,9 @@ int fs_create(char* file_name) {
       dir[d].first_block = e;
       fat[e] = 2;
       buffer = (char*)fat;
-      for(c = 0; c < 256; c++) /*32 bloco da fat * 8 setores por bloco */
-        bl_write(c, (buffer+ c * 512)); /*para ler de 512byte em 512byte*/
-
+      bl_write(e/256, buffer + (e/256)*512); /* Salvando apenas o bloco da FAT Alterada.*/
       buffer = (char *) dir; /*parando em cima do DIR*/
-      for(c = 0; c < 8; c++) /*4K / 512 (SECTORSIZE)*/
-        bl_write(c+256, buffer + c*512);
-
+      bl_write(256 + d/16, buffer + (d/16)*512); /*Salvando apenas o bloco do DIR alterado*/
       return 1;
     }
   perror("Disco cheio!\n");
