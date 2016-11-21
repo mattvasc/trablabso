@@ -116,11 +116,14 @@ cando a saída formatada em buffer . O formato é simples, um arquivo
 por linha, seguido de seu tamanho e separado por dois tabs. Observe
 que a sua função não deve escrever na tela.*/
 int fs_list(char *buffer, int size) { // ARRUMAR PARA VER OVERFLOW NA STRING
-  int i, imprimiu;
+  int i, imprimiu, count=0;
   for(i = 0; i < 128; i++){
     if(dir[i].used){
       imprimiu = sprintf(buffer,"%s\t\t%d\n", dir[i].name, dir[i].size);
       buffer+=imprimiu;
+      count+=imprimiu; // Se deu overflow na string
+      if(count>=4096)
+        return 0; // Deu erro
     }
   }
   buffer='\0';
@@ -276,9 +279,12 @@ int fs_open(char *file_name, int mode) {
 file . Um erro deve ser gerado se não existe arquivo aberto com este
 identificador.*/
 int fs_close(int file)  {
-  if(arq_abertos[file])
-  printf("Função não implementada: fs_close\n");
-  return 0;
+  if(!arq_abertos[file].used){
+    printf("Arquivo não existente\n");
+    return 0;
+  }
+  arq_abertos[file].used = 0;
+  return 1;
 }
 /*Escreve size bytes do
 buffer no arquivo aberto com identificador file . Retorna quantidade
