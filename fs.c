@@ -37,7 +37,16 @@ typedef struct {
        int size;
 } dir_entry;
 
+typedef struct {
+  char used;
+  char buffer[4096];
+  int bloco_atual;
+  int dir;
+} open_file;
+
 dir_entry dir[128]; /*COLEÇÃO DE DIRETÓRIOS*/
+open_file arq_abertos[128];
+
 
 /*Inicia o sistema de arquivos e suas estruturas internas. Esta
 função é automaticamente chamada pelo interpretador de comandos no
@@ -56,13 +65,16 @@ int fs_init()
     if(fat[c] != 3)
       return fs_format();
 
+  for(c=0;c<128;c++)
+    file[c].used = 0;
+
   if(fat[c] != 4)
     return fs_format();
-
+/*
 buffer = (char *) dir;
 
 for(c = 0; c < 8; c++)
-  bl_read(c+256, buffer + c * 512);
+  bl_read(c+256, buffer + c * 512);*/
 
   return 1;
 }
@@ -103,7 +115,7 @@ int fs_free() {
 cando a saída formatada em buffer . O formato é simples, um arquivo
 por linha, seguido de seu tamanho e separado por dois tabs. Observe
 que a sua função não deve escrever na tela.*/
-int fs_list(char *buffer, int size) {
+int fs_list(char *buffer, int size) { // ARRUMAR PARA VER OVERFLOW NA STRING
   int i, imprimiu;
   for(i = 0; i < 128; i++){
     if(dir[i].used){
@@ -137,7 +149,7 @@ int fs_create(char* file_name) {
       dir[d].used = 1;
       dir[d].size = 0;
       dir[d].first_block = e;
-      fat[e] = 2;
+      fat[e] = 2; // Marcando como fim de bloco
       buffer = (char*)fat;
       bl_write(e/256, buffer + (e/256)*512); /* Salvando apenas o bloco da FAT Alterada.*/
       buffer = (char *) dir; /*parando em cima do DIR*/
@@ -195,13 +207,76 @@ quivo pré-existente deve ser apagado e criado novamente com tamanho
 0. Retorna o identificador do arquivo aberto, um inteiro, ou -1 em caso
 de erro.*/
 int fs_open(char *file_name, int mode) {
-  printf("Função não implementada: fs_open\n");
+  int c,d,e,achou=0, posicaoInicialFAT, prox;
+  for(c=0,d=-1; c<128; c++)
+  {
+    if(dir[c].used && !strcmp(file_name,dir[c].name)) {
+      if(mode==FS_W)
+      {
+        // Removendo o arquivo:
+        posicaoInicialFAT = dir[c].first_block;
+        prox = fat[posicaoInicialFAT];
+        fat[posicaoInicialFAT] = 1;
+
+        while(prox != 2){
+          prox = fat[prox];
+          fat[prox] = 1;
+        }
+        //Definindo tamanho = 0
+        dir[c].size = 0;
+        fat[ dir[c].first_block ] = 2;
+
+        // "Recriando" o arquivo
+      }
+      achou = 1;
+      break;
+    }
+    else if(!dir[c].used && d ==-1 )
+      d = c; // Primeiro diretório vazio encontrado
+  }
+  if(!achou){
+    if( mode==FS_R)
+    {
+      printf("Arquivo não encontrado!\n");
+      return -1;
+    }
+    else if(mode==FS_W){ // NAO ACHOU O ARQUIVO NO MODO ESCRITA, CRIANDO ELE DO ZERO
+      // CRIA O ARQUIVO NO dir[d];
+        if(d==-1)
+          return -1; // DIR CHEIO
+        for(e = 33, achou=0; e < bl_size()/8; e++)
+          if(fat[e]==1){
+            dir[d].first_block = e;
+            achou = 1;
+          }
+        if(!achou)
+          return -1; // FAT CHEIA
+        dir[d].used = 1;
+        dir[d].size = 0;
+        strcpy(dir[d].name, file_name);
+        c = d;
+    }
+  }
+  // Abrindo o arquivo
+  // no primeiro file[livre] pega os dados de dir[c];
+  for(d=0;d<128;d++)
+    if(!file[d].used){
+      arq_abertos[d].used = 1;
+      arq_abertos[d].dir = c;
+      arq_abertos[d].bloco_atual = 0;
+      for(e=0;e<8;e++)
+        bl_read( dir[c].first_block*8 + e , arq_abertos[d].buffer + e * 512);
+      return d;
+    }
+
+  // printf("Função não implementada: fs_open\n");
   return -1;
 }
 /*Fecha o arquivo dado pelo identificador de arquivo
 file . Um erro deve ser gerado se não existe arquivo aberto com este
 identificador.*/
 int fs_close(int file)  {
+  if(arq_abertos[file])
   printf("Função não implementada: fs_close\n");
   return 0;
 }
