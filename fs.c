@@ -65,16 +65,16 @@ int fs_init()
     if(fat[c] != 3)
       return fs_format();
 
-  for(c=0;c<128;c++)
-    file[c].used = 0;
-
   if(fat[c] != 4)
     return fs_format();
-/*
-buffer = (char *) dir;
+  for(c=0;c<128;c++)
+    arq_abertos[c].used = 0;
 
-for(c = 0; c < 8; c++)
-  bl_read(c+256, buffer + c * 512);*/
+  // Carregando o diretório para memória para outras aplicações
+  buffer = (char *) dir;
+
+  for(c = 0; c < 8; c++)
+    bl_read(c+256, buffer + c * 512);
 
   return 1;
 }
@@ -188,16 +188,12 @@ int fs_remove(char *file_name){
       prox = fat[prox];
       fat[prox] = 1;
     }
+    buffer = (char *) dir;
+    bl_write(256 + i/16, buffer + (i/16)*512); /*Salvando apenas o bloco do DIR alterado*/
 
     buffer = (char *) fat;
-
-    for(i = 0; i < 256; i++)
+    for(i = 0; i < 256; i++)  // Escrevendo a FAT inteira no Disco
       bl_write(i, buffer + 512 * i);
-
-    buffer = (char *) dir;
-
-    for (i = 0; i < 8; i++)
-      bl_write(i + 256, buffer + 512 * i);
 
     return 1;
   }
@@ -263,7 +259,7 @@ int fs_open(char *file_name, int mode) {
   // Abrindo o arquivo
   // no primeiro file[livre] pega os dados de dir[c];
   for(d=0;d<128;d++)
-    if(!file[d].used){
+    if(!arq_abertos[d].used){
       arq_abertos[d].used = 1;
       arq_abertos[d].dir = c;
       arq_abertos[d].bloco_atual = 0;
