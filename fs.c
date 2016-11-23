@@ -276,7 +276,7 @@ int fs_open(char *file_name, int mode) {
     if(!arq_abertos[d].used){
       arq_abertos[d].used = 1;
       arq_abertos[d].dir = c;
-      arq_abertos[d].bloco_atual = 0;
+      arq_abertos[d].bloco_atual = dir[arq_abertos[d].dir].first_block;
       arq_abertos[d].byte_atual = 0;
       arq_abertos[d].mode = mode;
       arq_abertos[d].indice_bloco = dir[arq_abertos[d].dir].first_block;
@@ -285,7 +285,7 @@ int fs_open(char *file_name, int mode) {
         bl_read( dir[c].first_block*8 + e , arq_abertos[d].buffer + e * 512);
 
       for(buffer = (char *) fat, c = 0; c < 256; c++) /*32 bloco da fat * 8 setores por bloco */
-        bl_write(c, (buffer+ c * 512)); /*para ler de 512byte em 512byte*/      
+        bl_write(c, (buffer+ c * 512)); /*para ler de 512byte em 512byte*/
 
       return d;
     }
@@ -297,11 +297,14 @@ int fs_open(char *file_name, int mode) {
 file . Um erro deve ser gerado se não existe arquivo aberto com este
 identificador.*/
 int fs_close(int file)  {
+  int c;
   if(!arq_abertos[file].used){
     printf("Arquivo não existente\n");
     return 0;
   }
   arq_abertos[file].used = 0;
+  for(c=0;c<8;c++)
+    bl_write(arq_abertos[file].bloco_atual * 8 + c,arq_abertos[file].buffer + c*512);
   free(arq_abertos[file].buffer);
   return 1;
 }
@@ -326,10 +329,10 @@ int fs_write(char *buffer, int size, int file) {
           bl_write(e/256, disco_p + (e/256)*512); /* Salvando apenas o bloco da FAT Alterada.*/
           fat[arq_abertos[file].indice_bloco] = e;
           bl_write(arq_abertos[file].indice_bloco/256, disco_p + (arq_abertos[file].indice_bloco/256)*512);
-          
+
           for(f = 0; f < 8; f++) {
             bl_write(arq_abertos[file].indice_bloco * 8 + f, arq_abertos[file].buffer + 512 * f);
-          }     
+          }
 
           arq_abertos[file].byte_atual = 0;
           arq_abertos[file].bloco_atual = e;
@@ -337,7 +340,7 @@ int fs_write(char *buffer, int size, int file) {
           break;
         }
     }
-      
+
     arq_abertos[file].buffer[arq_abertos[file].byte_atual++] = buffer[c];
   }
 

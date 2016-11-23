@@ -12,4 +12,4 @@ shell.o: disk.h fs.h
 
 .PHONY : clean
 clean:
-	rm -f *.o *~ rsfs
+	rm -f *.o *~ rsfs hd.lbso
