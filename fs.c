@@ -22,6 +22,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "disk.h"
 #include "fs.h"
@@ -39,8 +40,11 @@ typedef struct {
 
 typedef struct {
   char used;
-  char buffer[4096];
+  char *buffer;
+  int indice_bloco;
   int bloco_atual;
+  int byte_atual;
+  int mode;
   int dir;
 } open_file;
 
@@ -207,6 +211,7 @@ quivo pré-existente deve ser apagado e criado novamente com tamanho
 de erro.*/
 int fs_open(char *file_name, int mode) {
   int c,d,e,achou=0, posicaoInicialFAT, prox;
+  char *buffer;
   for(c=0,d=-1; c<128; c++)
   {
     if(dir[c].used && !strcmp(file_name,dir[c].name)) {
@@ -246,7 +251,10 @@ int fs_open(char *file_name, int mode) {
         for(e = 33, achou=0; e < bl_size()/8; e++)
           if(fat[e]==1){
             dir[d].first_block = e;
+            fat[e] = 2;
             achou = 1;
+
+            break;
           }
         if(!achou)
           return -1; // FAT CHEIA
@@ -254,6 +262,12 @@ int fs_open(char *file_name, int mode) {
         dir[d].size = 0;
         strcpy(dir[d].name, file_name);
         c = d;
+
+        buffer = (char *) fat;
+        bl_write(fat[e]/256, buffer + (fat[e]/256)*512);
+
+        buffer = (char *) dir;
+        bl_write(256 + d/16, buffer + (d/16)*512); /*Salvando apenas o bloco do DIR alterado*/
     }
   }
   // Abrindo o arquivo
@@ -263,8 +277,16 @@ int fs_open(char *file_name, int mode) {
       arq_abertos[d].used = 1;
       arq_abertos[d].dir = c;
       arq_abertos[d].bloco_atual = 0;
+      arq_abertos[d].byte_atual = 0;
+      arq_abertos[d].mode = mode;
+      arq_abertos[d].indice_bloco = dir[arq_abertos[d].dir].first_block;
+      arq_abertos[d].buffer = malloc(4096);
       for(e=0;e<8;e++)
         bl_read( dir[c].first_block*8 + e , arq_abertos[d].buffer + e * 512);
+
+      for(buffer = (char *) fat, c = 0; c < 256; c++) /*32 bloco da fat * 8 setores por bloco */
+        bl_write(c, (buffer+ c * 512)); /*para ler de 512byte em 512byte*/      
+
       return d;
     }
 
@@ -280,6 +302,7 @@ int fs_close(int file)  {
     return 0;
   }
   arq_abertos[file].used = 0;
+  free(arq_abertos[file].buffer);
   return 1;
 }
 /*Escreve size bytes do
@@ -288,8 +311,39 @@ de bytes escritos (0 se não escreveu nada, -1 em caso de erro). Um erro
 deve ser gerado se não existe arquivo aberto com este identificador ou
 caso o arquivo tenha sido aberto para leitura.*/
 int fs_write(char *buffer, int size, int file) {
-  printf("Função não implementada: fs_write\n");
-  return -1;
+  int c, e, f;
+  char *disco_p;
+  if(arq_abertos[file].mode != FS_W)
+    return -1;
+
+  for (c = 0; c < size; c++)
+  {
+    if(arq_abertos[file].byte_atual == 4096){
+      for(e = 33; e < bl_size()/8; e++)
+        if(fat[e]==1){
+          fat[e] = 2; // Marcando como fim de bloco
+          disco_p = (char*)fat;
+          bl_write(e/256, disco_p + (e/256)*512); /* Salvando apenas o bloco da FAT Alterada.*/
+          fat[arq_abertos[file].indice_bloco] = e;
+          bl_write(arq_abertos[file].indice_bloco/256, disco_p + (arq_abertos[file].indice_bloco/256)*512);
+          
+          for(f = 0; f < 8; f++) {
+            bl_write(arq_abertos[file].indice_bloco * 8 + f, arq_abertos[file].buffer + 512 * f);
+          }     
+
+          arq_abertos[file].byte_atual = 0;
+          arq_abertos[file].bloco_atual = e;
+
+          break;
+        }
+    }
+      
+    arq_abertos[file].buffer[arq_abertos[file].byte_atual++] = buffer[c];
+  }
+
+  dir[arq_abertos[file].dir].size += c;
+
+  return c;
 }
 /*Lê no máximo size by-
 tes no buffer do arquivo aberto com identificador file . Retorna quan-
