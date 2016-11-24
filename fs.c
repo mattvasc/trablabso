@@ -49,7 +49,7 @@ typedef struct {
 } open_file;
 
 dir_entry dir[128]; /*COLEÇÃO DE DIRETÓRIOS*/
-open_file arq_abertos[128];
+open_file arq_aberto[128];
 
 
 /*Inicia o sistema de arquivos e suas estruturas internas. Esta
@@ -72,7 +72,7 @@ int fs_init()
   if(fat[c] != 4)
     return fs_format();
   for(c=0;c<128;c++)
-    arq_abertos[c].used = 0;
+    arq_aberto[c].used = 0;
 
   // Carregando o diretório para memória para outras aplicações
   buffer = (char *) dir;
@@ -273,16 +273,16 @@ int fs_open(char *file_name, int mode) {
   // Abrindo o arquivo
   // no primeiro file[livre] pega os dados de dir[c];
   for(d=0;d<128;d++)
-    if(!arq_abertos[d].used){
-      arq_abertos[d].used = 1;
-      arq_abertos[d].dir = c;
-      arq_abertos[d].bloco_atual = dir[arq_abertos[d].dir].first_block;
-      arq_abertos[d].byte_atual = 0;
-      arq_abertos[d].mode = mode;
-      arq_abertos[d].indice_bloco = dir[arq_abertos[d].dir].first_block;
-      arq_abertos[d].buffer = malloc(4096);
+    if(!arq_aberto[d].used){
+      arq_aberto[d].used = 1;
+      arq_aberto[d].dir = c;
+      arq_aberto[d].bloco_atual = dir[arq_aberto[d].dir].first_block;
+      arq_aberto[d].byte_atual = 0;
+      arq_aberto[d].mode = mode;
+      arq_aberto[d].indice_bloco = 0;
+      arq_aberto[d].buffer = malloc(4096);
       for(e=0;e<8;e++)
-        bl_read( dir[c].first_block*8 + e , arq_abertos[d].buffer + e * 512);
+        bl_read( dir[c].first_block*8 + e , arq_aberto[d].buffer + e * 512);
 
       for(buffer = (char *) fat, c = 0; c < 256; c++) /*32 bloco da fat * 8 setores por bloco */
         bl_write(c, (buffer+ c * 512)); /*para ler de 512byte em 512byte*/
@@ -298,14 +298,16 @@ file . Um erro deve ser gerado se não existe arquivo aberto com este
 identificador.*/
 int fs_close(int file)  {
   int c;
-  if(!arq_abertos[file].used){
+  if(!arq_aberto[file].used){
     printf("Arquivo não existente\n");
     return 0;
   }
-  arq_abertos[file].used = 0;
-  for(c=0;c<8;c++)
-    bl_write(arq_abertos[file].bloco_atual * 8 + c,arq_abertos[file].buffer + c*512);
-  free(arq_abertos[file].buffer);
+  arq_aberto[file].used = 0;
+
+  if(arq_aberto[file].mode == FS_W)
+      for(c=0;c<8;c++)
+        bl_write(arq_aberto[file].bloco_atual * 8 + c,arq_aberto[file].buffer + c*512);
+  free(arq_aberto[file].buffer);
   return 1;
 }
 /*Escreve size bytes do
@@ -316,35 +318,36 @@ caso o arquivo tenha sido aberto para leitura.*/
 int fs_write(char *buffer, int size, int file) {
   int c, e, f;
   char *disco_p;
-  if(arq_abertos[file].mode != FS_W)
+  if(arq_aberto[file].mode != FS_W)
     return -1;
 
   for (c = 0; c < size; c++)
   {
-    if(arq_abertos[file].byte_atual == 4096){
+    if(arq_aberto[file].byte_atual == 4096){
       for(e = 33; e < bl_size()/8; e++)
         if(fat[e]==1){
           fat[e] = 2; // Marcando como fim de bloco
           disco_p = (char*)fat;
           bl_write(e/256, disco_p + (e/256)*512); /* Salvando apenas o bloco da FAT Alterada.*/
-          fat[arq_abertos[file].indice_bloco] = e;
-          bl_write(arq_abertos[file].indice_bloco/256, disco_p + (arq_abertos[file].indice_bloco/256)*512);
+          fat[arq_aberto[file].indice_bloco] = e;
+          bl_write(arq_aberto[file].indice_bloco/256, disco_p + (arq_aberto[file].indice_bloco/256)*512);
 
           for(f = 0; f < 8; f++) {
-            bl_write(arq_abertos[file].indice_bloco * 8 + f, arq_abertos[file].buffer + 512 * f);
+            bl_write(arq_aberto[file].indice_bloco * 8 + f, arq_aberto[file].buffer + 512 * f);
           }
 
-          arq_abertos[file].byte_atual = 0;
-          arq_abertos[file].bloco_atual = e;
+          arq_aberto[file].byte_atual = 0;
+          arq_aberto[file].bloco_atual = e;
+          arq_aberto[file].indice_bloco++;
 
           break;
         }
     }
 
-    arq_abertos[file].buffer[arq_abertos[file].byte_atual++] = buffer[c];
+    arq_aberto[file].buffer[arq_aberto[file].byte_atual++] = buffer[c];
   }
 
-  dir[arq_abertos[file].dir].size += c;
+  dir[arq_aberto[file].dir].size += c;
 
   return c;
 }
@@ -355,6 +358,47 @@ arquivo terminou, -1 em caso de erro). Um erro deve ser gerado se não
 existe arquivo aberto com este identificador ou caso o arquivo tenha sido
 aberto para escrita.*/
 int fs_read(char *buffer, int size, int file) {
-  printf("Função não implementada: fs_read\n");
-  return -1;
+
+  printf("Bloco tual: %d, indiss bloko: %d\n\n",  arq_aberto[file].bloco_atual,arq_aberto[file].indice_bloco);
+
+  int c, d;
+  if(arq_aberto[file].mode != FS_R)
+  {
+    printf("ERRO: Tentando ler um arquivo aberto para escrita!\n");
+    return -1;
+  }
+  for(c=0;c<size; c++)    
+  {   
+      if(arq_aberto[file].indice_bloco * 4096 + c < dir[file].size)
+      {
+        if(arq_aberto[file].byte_atual == 4096)
+        {
+          if(fat[arq_aberto[file].bloco_atual] != 2)
+          {
+            for(d = 0; d < 8; d++)
+            {
+              bl_read(fat[arq_aberto[file].bloco_atual] / 8 + d, arq_aberto[file].buffer + 512 * d);
+            }
+
+            arq_aberto[file].indice_bloco++;
+            arq_aberto[file].byte_atual = 0;
+            arq_aberto[file].bloco_atual = fat[arq_aberto[file].bloco_atual];
+          }
+          else
+          {
+            return c;
+          }
+        }
+
+        buffer[c] = arq_aberto[file].buffer[arq_aberto[file].byte_atual++];
+      }
+      else
+      {
+        arq_aberto[file].indice_bloco++;
+        //break;
+      }
+      
+  }   
+  
+  return c;
 }
