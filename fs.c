@@ -161,7 +161,7 @@ int fs_create(char* file_name) {
       bl_write(e/256, buffer + (e/256)*512); /* Salvando apenas o bloco da FAT Alterada.*/
       buffer = (char *) dir; /*parando em cima do DIR*/
       bl_write(256 + d/16, buffer + (d/16)*512); /*Salvando apenas o bloco do DIR alterado*/
-      return 1;
+      return d;
     }
   perror("Disco cheio!\n");
   return 0;
@@ -170,7 +170,7 @@ int fs_create(char* file_name) {
 /*Remove o arquivo com nome
 file_name . Um erro deve ser gerado se o arquivo não existe.*/
 int fs_remove(char *file_name){
-  int i,prox;
+  int i,prox, temp;
   unsigned short posicaoInicialFAT;
   char existe = 0, *buffer;
   /*busco o nome do arquivo e salvo o primeiro bloco*/
@@ -189,8 +189,9 @@ int fs_remove(char *file_name){
     prox = fat[posicaoInicialFAT];
     fat[posicaoInicialFAT] = 1;
     while(prox != 2){
-      prox = fat[prox];
+      temp = fat[prox];
       fat[prox] = 1;
+      prox = temp;
     }
     buffer = (char *) dir;
     bl_write(256 + i/16, buffer + (i/16)*512); /*Salvando apenas o bloco do DIR alterado*/
@@ -210,33 +211,19 @@ quivo pré-existente deve ser apagado e criado novamente com tamanho
 0. Retorna o identificador do arquivo aberto, um inteiro, ou -1 em caso
 de erro.*/
 int fs_open(char *file_name, int mode) {
-  int c,d,e,achou=0, posicaoInicialFAT, prox;
-  char *buffer;
+  int c,d,e,achou=0;
   for(c=0,d=-1; c<128; c++)
   {
     if(dir[c].used && !strcmp(file_name,dir[c].name)) {
       if(mode==FS_W)
       {
-        // Removendo o arquivo:
-        posicaoInicialFAT = dir[c].first_block;
-        prox = fat[posicaoInicialFAT];
-        fat[posicaoInicialFAT] = 1;
-
-        while(prox != 2){
-          prox = fat[prox];
-          fat[prox] = 1;
-        }
-        //Definindo tamanho = 0
-        dir[c].size = 0;
-        fat[ dir[c].first_block ] = 2;
-
-        // "Recriando" o arquivo
+        fs_remove(file_name);
+        e = fs_create(file_name);
       }
       achou = 1;
+      e = c;
       break;
     }
-    else if(!dir[c].used && d ==-1 )
-      d = c; // Primeiro diretório vazio encontrado
   }
   if(!achou){
     if( mode==FS_R)
@@ -246,28 +233,7 @@ int fs_open(char *file_name, int mode) {
     }
     else if(mode==FS_W){ // NAO ACHOU O ARQUIVO NO MODO ESCRITA, CRIANDO ELE DO ZERO
       // CRIA O ARQUIVO NO dir[d];
-        if(d==-1)
-          return -1; // DIR CHEIO
-        for(e = 33, achou=0; e < bl_size()/8; e++)
-          if(fat[e]==1){
-            dir[d].first_block = e;
-            fat[e] = 2;
-            achou = 1;
-
-            break;
-          }
-        if(!achou)
-          return -1; // FAT CHEIA
-        dir[d].used = 1;
-        dir[d].size = 0;
-        strcpy(dir[d].name, file_name);
-        c = d;
-
-        buffer = (char *) fat;
-        bl_write(fat[e]/256, buffer + (fat[e]/256)*512);
-
-        buffer = (char *) dir;
-        bl_write(256 + d/16, buffer + (d/16)*512); /*Salvando apenas o bloco do DIR alterado*/
+      e = fs_create(file_name);
     }
   }
   // Abrindo o arquivo
@@ -275,22 +241,16 @@ int fs_open(char *file_name, int mode) {
   for(d=0;d<128;d++)
     if(!arq_aberto[d].used){
       arq_aberto[d].used = 1;
-      arq_aberto[d].dir = c;
-      arq_aberto[d].bloco_atual = dir[arq_aberto[d].dir].first_block;
+      arq_aberto[d].dir = e;
+      arq_aberto[d].bloco_atual = dir[e].first_block;
       arq_aberto[d].byte_atual = 0;
       arq_aberto[d].mode = mode;
       arq_aberto[d].indice_bloco = 0;
       arq_aberto[d].buffer = malloc(4096);
       for(e=0;e<8;e++)
         bl_read( dir[c].first_block*8 + e , arq_aberto[d].buffer + e * 512);
-
-      for(buffer = (char *) fat, c = 0; c < 256; c++) /*32 bloco da fat * 8 setores por bloco */
-        bl_write(c, (buffer+ c * 512)); /*para ler de 512byte em 512byte*/
-
       return d;
     }
-
-  // printf("Função não implementada: fs_open\n");
   return -1;
 }
 /*Fecha o arquivo dado pelo identificador de arquivo
@@ -327,13 +287,14 @@ int fs_write(char *buffer, int size, int file) {
       for(e = 33; e < bl_size()/8; e++)
         if(fat[e]==1){
           fat[e] = 2; // Marcando como fim de bloco
+          fat[arq_aberto[file].bloco_atual] = e;
+          arq_aberto[file].indice_bloco++;
           disco_p = (char*)fat;
           bl_write(e/256, disco_p + (e/256)*512); /* Salvando apenas o bloco da FAT Alterada.*/
-          fat[arq_aberto[file].indice_bloco] = e;
-          bl_write(arq_aberto[file].indice_bloco/256, disco_p + (arq_aberto[file].indice_bloco/256)*512);
+          bl_write(arq_aberto[file].bloco_atual/256, disco_p + (arq_aberto[file].bloco_atual/256)*512);
 
           for(f = 0; f < 8; f++) {
-            bl_write(arq_aberto[file].indice_bloco * 8 + f, arq_aberto[file].buffer + 512 * f);
+            bl_write(arq_aberto[file].bloco_atual * 8 + f, arq_aberto[file].buffer + 512 * f);
           }
 
           arq_aberto[file].byte_atual = 0;
@@ -357,9 +318,9 @@ tidade de bytes efetivamente lidos (0 se não leu nada, o que indica que o
 arquivo terminou, -1 em caso de erro). Um erro deve ser gerado se não
 existe arquivo aberto com este identificador ou caso o arquivo tenha sido
 aberto para escrita.*/
+int vez = 0;
 int fs_read(char *buffer, int size, int file) {
-
-  printf("Bloco tual: %d, indiss bloko: %d\n\n",  arq_aberto[file].bloco_atual,arq_aberto[file].indice_bloco);
+  printf("%d. indice:%d na_fat:%d byte_atual:%d\n",vez++,arq_aberto[file].indice_bloco,arq_aberto[file].bloco_atual,arq_aberto[file].byte_atual);
 
   int c, d;
   if(arq_aberto[file].mode != FS_R)
@@ -367,15 +328,15 @@ int fs_read(char *buffer, int size, int file) {
     printf("ERRO: Tentando ler um arquivo aberto para escrita!\n");
     return -1;
   }
-  for(c=0;c<size; c++)    
-  {   
-      if(arq_aberto[file].indice_bloco * 4096 + c < dir[file].size)
+  for(c=0;c<size; c++)
+  {
+      if(arq_aberto[file].indice_bloco * 4096 + arq_aberto[file].byte_atual < dir[arq_aberto[file].dir].size) // Se der para ler !
       {
-        if(arq_aberto[file].byte_atual == 4096)
+        if(arq_aberto[file].byte_atual == 4096) // Se chegou no fim do buffer
         {
-          if(fat[arq_aberto[file].bloco_atual] != 2)
+          if(fat[arq_aberto[file].bloco_atual] != 2) // Olhando para o proximo bloco na fat
           {
-            for(d = 0; d < 8; d++)
+            for(d = 0; d < 8; d++) // Carregando para memoria
             {
               bl_read(fat[arq_aberto[file].bloco_atual] / 8 + d, arq_aberto[file].buffer + 512 * d);
             }
@@ -384,21 +345,20 @@ int fs_read(char *buffer, int size, int file) {
             arq_aberto[file].byte_atual = 0;
             arq_aberto[file].bloco_atual = fat[arq_aberto[file].bloco_atual];
           }
-          else
+          else // Caso o arquivo arquivo não possua mais blocos:
           {
             return c;
           }
         }
-
         buffer[c] = arq_aberto[file].buffer[arq_aberto[file].byte_atual++];
-      }
+      } // EOF:
       else
       {
         arq_aberto[file].indice_bloco++;
-        //break;
+        return c;
+          //break;
       }
-      
-  }   
-  
+
+  }
   return c;
 }
