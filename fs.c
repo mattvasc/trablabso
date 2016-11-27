@@ -309,6 +309,8 @@ int fs_write(char *buffer, int size, int file) {
   }
 
   dir[arq_aberto[file].dir].size += c;
+  disco_p = (char*) dir;
+  bl_write(256 + arq_aberto[file].dir/16, disco_p + (arq_aberto[file].dir/16)*512); /*Salvando apenas o bloco do DIR alterado*/
 
   return c;
 }
@@ -320,7 +322,6 @@ existe arquivo aberto com este identificador ou caso o arquivo tenha sido
 aberto para escrita.*/
 int vez = 0;
 int fs_read(char *buffer, int size, int file) {
-  printf("%d. indice:%d na_fat:%d byte_atual:%d\n",vez++,arq_aberto[file].indice_bloco,arq_aberto[file].bloco_atual,arq_aberto[file].byte_atual);
 
   int c, d;
   if(arq_aberto[file].mode != FS_R)
@@ -338,7 +339,7 @@ int fs_read(char *buffer, int size, int file) {
           {
             for(d = 0; d < 8; d++) // Carregando para memoria
             {
-              bl_read(fat[arq_aberto[file].bloco_atual] / 8 + d, arq_aberto[file].buffer + 512 * d);
+              bl_read(fat[arq_aberto[file].bloco_atual] * 8 + d, arq_aberto[file].buffer + 512 * d);
             }
 
             arq_aberto[file].indice_bloco++;
